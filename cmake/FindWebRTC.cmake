@@ -1,0 +1,30 @@
+
+find_package(PkgConfig)
+pkg_check_modules(PC_LIBWEBRTCDSP webrtc-audio-processing)
+set(LIBWEBRTCDSP_DEFINITIONS ${PC_LIBWEBRTCDSP_CFLAGS_OTHER})
+
+find_path(LIBWEBRTCDSP_INCLUDE_DIR webrtc/common.h
+		HINTS ${PC_LIBWEBRTCDSP_INCLUDEDIR} ${PC_LIBWEBRTCDSP_INCLUDE_DIRS}
+		PATH_SUFFIXES libwebrtc_audio_processing)
+
+find_library(LIBWEBRTCDSP_LIBRARY NAMES webrtc_audio_processing
+		HINTS ${PC_LIBWEBRTCDSP_LIBDIR} ${PC_LIBWEBRTCDSP_LIBRARY_DIRS} )
+
+include(FindPackageHandleStandardArgs)
+# handle the QUIETLY and REQUIRED arguments and set LIBWEBRTCDSP2_FOUND to TRUE
+# if all listed variables are TRUE
+find_package_handle_standard_args(WebRTC DEFAULT_MSG
+		LIBWEBRTCDSP_LIBRARY LIBWEBRTCDSP_INCLUDE_DIR)
+
+mark_as_advanced(LIBWEBRTCDSP_INCLUDE_DIR LIBWEBRTCDSP_LIBRARY )
+
+if(NOT TARGET WebRTC)
+	add_library(WebRTC UNKNOWN IMPORTED)
+	set_target_properties(WebRTC PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${LIBWEBRTCDSP_INCLUDE_DIR}")
+	set_property(TARGET WebRTC PROPERTY IMPORTED_LOCATION "${LIBWEBRTCDSP_LIBRARY}")
+	if (UNIX)
+		target_compile_definitions(WebRTC INTERFACE WEBRTC_POSIX WEBRTC_AUDIO_PROCESSING_ONLY_BUILD)
+	elseif(WIN32)
+		target_compile_definitions(WebRTC INTERFACE WEBRTC_WIN WEBRTC_AUDIO_PROCESSING_ONLY_BUILD)
+	endif()
+endif()
