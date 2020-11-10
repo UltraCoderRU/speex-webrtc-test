@@ -1,13 +1,15 @@
 #include "WebRTCDSP.h"
 
+#include <webrtc/api/audio/audio_frame.h>
 #include <webrtc/modules/audio_processing/include/audio_processing.h>
-#include <webrtc/modules/interface/module_common_types.h>
 
 #include <QLoggingCategory>
 
 namespace SpeexWebRTCTest {
 
 namespace {
+
+using NoiseSuppressionLevel = webrtc::AudioProcessing::Config::NoiseSuppression::Level;
 
 Q_LOGGING_CATEGORY(WebRTC, "webrtc")
 
@@ -16,8 +18,7 @@ void convert(const QAudioBuffer& from, webrtc::AudioFrame& to)
 	to.num_channels_ = from.format().channelCount();
 	to.sample_rate_hz_ = from.format().sampleRate();
 	to.samples_per_channel_ = from.frameCount();
-	to.interleaved_ = (from.format().channelCount() > 1);
-	memcpy(to.data_, from.constData<char>(), from.byteCount());
+	memcpy(to.mutable_data(), from.constData<char>(), from.byteCount());
 }
 
 void convert(const webrtc::AudioFrame& from, QAudioBuffer& to)
@@ -30,7 +31,7 @@ void convert(const webrtc::AudioFrame& from, QAudioBuffer& to)
 	format.setByteOrder(QAudioFormat::LittleEndian);
 	format.setSampleType(QAudioFormat::SignedInt);
 
-	QByteArray data(reinterpret_cast<const char*>(from.data_),
+	QByteArray data(reinterpret_cast<const char*>(from.data()),
 	                from.samples_per_channel_ * from.num_channels_ * sizeof(std::int16_t));
 	to = QAudioBuffer(data, format);
 }
@@ -40,33 +41,29 @@ void convert(const webrtc::AudioFrame& from, QAudioBuffer& to)
 WebRTCDSP::WebRTCDSP(const QAudioFormat& mainFormat, const QAudioFormat& auxFormat)
     : AudioEffect(mainFormat, auxFormat)
 {
-	apm_ = webrtc::AudioProcessing::Create();
+	apm_ = webrtc::AudioProcessingBuilder().Create();
+
 	if (!apm_)
 		throw std::runtime_error("failed to create webrtc::AudioProcessing instance");
 
-	webrtc::Config config;
-	config.Set<webrtc::DelayAgnostic>(new webrtc::DelayAgnostic(true));
-	config.Set<webrtc::ExtendedFilter>(new webrtc::ExtendedFilter(true));
-	apm_->SetExtraOptions(config);
+	webrtc::AudioProcessing::Config config;
 
-	apm_->voice_detection()->Enable(true);
-	apm_->voice_detection()->set_frame_size_ms(300);
-	apm_->voice_detection()->set_likelihood(webrtc::VoiceDetection::kModerateLikelihood);
+	config.voice_detection.enabled = true;
 
-	apm_->noise_suppression()->Enable(false);
-	apm_->noise_suppression()->set_level(webrtc::NoiseSuppression::kLow);
+	config.noise_suppression.enabled = false;
+	config.noise_suppression.level = NoiseSuppressionLevel::kLow;
 
-	apm_->echo_cancellation()->Enable(false);
-	apm_->echo_cancellation()->set_suppression_level(webrtc::EchoCancellation::kLowSuppression);
-	apm_->set_stream_delay_ms(100);
+	config.echo_canceller.enabled = false;
+	config.echo_canceller.mobile_mode = false;
+	config.residual_echo_detector.enabled = false;
 
-	apm_->gain_control()->Enable(false);
-	apm_->gain_control()->set_mode(webrtc::GainControl::kAdaptiveDigital);
-	apm_->gain_control()->enable_limiter(true);
-	apm_->gain_control()->set_compression_gain_db(0);
-	apm_->gain_control()->set_target_level_dbfs(0);
+	config.gain_controller1.enabled = false;
+	config.gain_controller1.mode = webrtc::AudioProcessing::Config::GainController1::kAdaptiveDigital;
+	config.gain_controller1.enable_limiter = true;
+	config.gain_controller1.compression_gain_db = 0;
+	config.gain_controller1.target_level_dbfs = 0;
 
-	// apm_->Initialize();
+	apm_->ApplyConfig(config);
 }
 
 WebRTCDSP::~WebRTCDSP()
@@ -132,7 +129,7 @@ void WebRTCDSP::processFrame(QAudioBuffer& mainBuffer, const QAudioBuffer& auxBu
 
 	int error;
 
-	if (apm_->echo_cancellation()->is_enabled())
+	if (apm_->GetConfig().echo_canceller.enabled)
 	{
 		error = apm_->ProcessReverseStream(&auxFrame);
 		if (error != 0)
@@ -153,30 +150,30 @@ void WebRTCDSP::processFrame(QAudioBuffer& mainBuffer, const QAudioBuffer& auxBu
 
 	convert(mainFrame, mainBuffer);
 
-	setVoiceActive(apm_->voice_detection()->stream_has_voice());
+	setVoiceActive(*apm_->GetStatistics().voice_detected);
 }
 
 void WebRTCDSP::setParameter(const QString& param, QVariant value)
 {
+	auto config = apm_->GetConfig();
 	if (param == "noise_reduction_enabled")
-		apm_->noise_suppression()->Enable(value.toBool());
+		config.noise_suppression.enabled = value.toBool();
 	else if (param == "noise_reduction_suppression_level")
-		apm_->noise_suppression()->set_level(static_cast<webrtc::NoiseSuppression::Level>(
-		    webrtc::NoiseSuppression::kLow + value.toUInt()));
+		config.noise_suppression.level =
+		    static_cast<NoiseSuppressionLevel>(NoiseSuppressionLevel::kLow + value.toUInt());
 	else if (param == "echo_cancellation_enabled")
-		apm_->echo_cancellation()->Enable(value.toBool());
+		config.echo_canceller.enabled = value.toBool();
 	else if (param == "echo_cancellation_suppression_level")
-		apm_->echo_cancellation()->set_suppression_level(
-		    static_cast<webrtc::EchoCancellation::SuppressionLevel>(
-		        webrtc::EchoCancellation::kLowSuppression + value.toUInt()));
+		return; // TODO ???
 	else if (param == "gain_control_enabled")
-		apm_->gain_control()->Enable(value.toBool());
+		config.gain_controller1.enabled = value.toBool();
 	else if (param == "gain_control_target_level")
-		apm_->gain_control()->set_target_level_dbfs(value.toInt());
+		config.gain_controller1.target_level_dbfs = value.toInt();
 	else if (param == "gain_control_max_gain")
-		apm_->gain_control()->set_compression_gain_db(value.toInt());
+		config.gain_controller1.compression_gain_db = value.toInt();
 	else
 		throw std::invalid_argument("Invalid param");
+	apm_->ApplyConfig(config);
 }
 
 unsigned int WebRTCDSP::requiredFrameSizeMs() const
