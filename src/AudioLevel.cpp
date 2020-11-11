@@ -52,6 +52,7 @@
 
 #include <QDebug>
 #include <QPainter>
+#include <QtMath>
 
 namespace SpeexWebRTCTest {
 
@@ -75,14 +76,27 @@ void AudioLevel::paintEvent(QPaintEvent* event)
 	Q_UNUSED(event);
 
 	const float maxLevel = 0;
-	const float minLevel = -60;
+	const float minLevel = -50;
+	const float redLevel = -1;
+	const float yellowLevel = -6;
+
+	const QColor greenColor = QColor(42, 168, 43);
+	const QColor yellowColor = "yellow";
+	const QColor redColor = "red";
 
 	QPainter painter(this);
-	// draw level
-	qreal heightLevel = (level_ - minLevel) / (maxLevel - minLevel) * height();
-	painter.fillRect(0, height() - heightLevel, width(), heightLevel, QColor(42, 168, 43));
-	// clear the rest of the control
-	painter.fillRect(0, 0, width(), height() - heightLevel, Qt::black);
+
+	auto drawArea = [&](float min, float max, const QColor& color)
+	{
+		int maxHeight = std::floor((max - minLevel) / (maxLevel - minLevel) * height());
+		int minHeight = std::floor((min - minLevel) / (maxLevel - minLevel) * height());
+		painter.fillRect(0, height() - maxHeight, width(), maxHeight - minHeight, color);
+	};
+
+	drawArea(minLevel, level_, greenColor);
+	drawArea(yellowLevel, level_, yellowColor);
+	drawArea(redLevel, level_, redColor);
+	drawArea(level_, maxLevel, Qt::black);
 }
 
 } // namespace SpeexWebRTCTest
