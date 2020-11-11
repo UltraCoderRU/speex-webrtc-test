@@ -10,17 +10,19 @@ typedef struct SpeexEchoState_ SpeexEchoState;
 
 namespace SpeexWebRTCTest {
 
-class SpeexDSP : public AudioEffect
+class SpeexDSP final : public AudioEffect
 {
 	Q_OBJECT
 public:
-	SpeexDSP(unsigned int frameSize, const QAudioFormat& mainFormat, const QAudioFormat& auxFormat);
+	SpeexDSP(const QAudioFormat& mainFormat, const QAudioFormat& auxFormat);
 	~SpeexDSP() override;
 
 	void processFrame(QAudioBuffer& mainBuffer, const QAudioBuffer& auxBuffer) override;
 	void setParameter(const QString& param, QVariant value) override;
 
 private:
+	unsigned int requiredFrameSizeMs() const override;
+
 	SpeexPreprocessState* preprocess_ = nullptr;
 	SpeexEchoState* echo_ = nullptr;
 

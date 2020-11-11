@@ -2,16 +2,14 @@
 
 namespace SpeexWebRTCTest {
 
-AudioEffect::AudioEffect(unsigned int frameSize,
-                         const QAudioFormat& mainFormat,
-                         const QAudioFormat& auxFormat)
-    : frameSize_(frameSize), mainFormat_(mainFormat), auxFormat_(auxFormat)
+AudioEffect::AudioEffect(const QAudioFormat& mainFormat, const QAudioFormat& auxFormat)
+    : mainFormat_(mainFormat), auxFormat_(auxFormat)
 {
 }
 
 unsigned int AudioEffect::getFrameSize() const
 {
-	return frameSize_;
+	return mainFormat_.sampleRate() * requiredFrameSizeMs() / 1000;
 }
 
 const QAudioFormat& AudioEffect::getMainFormat() const

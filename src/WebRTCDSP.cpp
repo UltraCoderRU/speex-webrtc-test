@@ -37,10 +37,8 @@ void convert(const webrtc::AudioFrame& from, QAudioBuffer& to)
 
 } // namespace
 
-WebRTCDSP::WebRTCDSP(unsigned int frameSize,
-                     const QAudioFormat& mainFormat,
-                     const QAudioFormat& auxFormat)
-    : AudioEffect(frameSize, mainFormat, auxFormat)
+WebRTCDSP::WebRTCDSP(const QAudioFormat& mainFormat, const QAudioFormat& auxFormat)
+    : AudioEffect(mainFormat, auxFormat)
 {
 	apm_ = webrtc::AudioProcessing::Create();
 	if (!apm_)
@@ -179,6 +177,11 @@ void WebRTCDSP::setParameter(const QString& param, QVariant value)
 		apm_->gain_control()->set_compression_gain_db(value.toInt());
 	else
 		throw std::invalid_argument("Invalid param");
+}
+
+unsigned int WebRTCDSP::requiredFrameSizeMs() const
+{
+	return 10;
 }
 
 } // namespace SpeexWebRTCTest

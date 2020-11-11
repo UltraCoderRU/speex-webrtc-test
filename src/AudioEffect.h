@@ -12,7 +12,7 @@ class AudioEffect : public QObject
 {
 	Q_OBJECT
 public:
-	AudioEffect(unsigned int frameSize, const QAudioFormat& mainFormat, const QAudioFormat& auxFormat);
+	AudioEffect(const QAudioFormat& mainFormat, const QAudioFormat& auxFormat);
 
 	virtual void processFrame(QAudioBuffer& mainBuffer, const QAudioBuffer& auxBuffer) = 0;
 
@@ -30,11 +30,12 @@ protected:
 		voiceActive_ = active;
 	}
 
+	virtual unsigned int requiredFrameSizeMs() const = 0;
+
 signals:
 	void voiceActivityChanged(bool voice);
 
 private:
-	const unsigned int frameSize_;
 	const QAudioFormat mainFormat_;
 	const QAudioFormat auxFormat_;
 

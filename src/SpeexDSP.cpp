@@ -13,8 +13,8 @@ int on = 1;
 int off = 0;
 } // namespace
 
-SpeexDSP::SpeexDSP(unsigned int frameSize, const QAudioFormat& mainFormat, const QAudioFormat& auxFormat)
-    : AudioEffect(frameSize, mainFormat, auxFormat)
+SpeexDSP::SpeexDSP(const QAudioFormat& mainFormat, const QAudioFormat& auxFormat)
+    : AudioEffect(mainFormat, auxFormat)
 {
 	preprocess_ = speex_preprocess_state_init(getFrameSize(), getMainFormat().sampleRate());
 	echo_ = speex_echo_state_init_mc(getFrameSize(), getFrameSize() * 10,
@@ -76,6 +76,11 @@ void SpeexDSP::setParameter(const QString& param, QVariant value)
 		speex_preprocess_ctl(preprocess_, SPEEX_PREPROCESS_SET_AGC_DECREMENT, value.data());
 	else
 		throw std::invalid_argument("Invalid param");
+}
+
+unsigned int SpeexDSP::requiredFrameSizeMs() const
+{
+	return 25;
 }
 
 } // namespace SpeexWebRTCTest

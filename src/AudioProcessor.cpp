@@ -196,15 +196,11 @@ Backend AudioProcessor::getCurrentBackend() const
 void AudioProcessor::switchBackend(Backend backend)
 {
 	if (backend == Backend::Speex)
-	{
-		bufferSize_ = format_.sampleRate() * 0.025; // 25ms
-		dsp_.reset(new SpeexDSP(bufferSize_, format_, monitorFormat_));
-	}
+		dsp_.reset(new SpeexDSP(format_, monitorFormat_));
 	else
-	{
-		bufferSize_ = format_.sampleRate() * 0.01; // 10ms
-		dsp_.reset(new WebRTCDSP(bufferSize_, format_, monitorFormat_));
-	}
+		dsp_.reset(new WebRTCDSP(format_, monitorFormat_));
+
+	bufferSize_ = dsp_->getFrameSize();
 
 	connect(dsp_.get(), &AudioEffect::voiceActivityChanged, this,
 	        &AudioProcessor::voiceActivityChanged);
