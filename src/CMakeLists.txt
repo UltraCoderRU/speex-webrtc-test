@@ -9,11 +9,11 @@ file(GLOB SOURCES *.cpp)
 file(GLOB HEADERS *.h)
 file(GLOB_RECURSE RESOURCES *.qrc)
 
-if (WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Release")
-	add_executable(${TARGET_NAME} WIN32 ${SOURCES} ${HEADERS} ${RESOURCES})
-else()
+#if (WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Release")
+#	add_executable(${TARGET_NAME} WIN32 ${SOURCES} ${HEADERS} ${RESOURCES})
+#else()
 	add_executable(${TARGET_NAME} ${SOURCES} ${HEADERS} ${RESOURCES})
-endif()
+#endif()
 
 target_link_libraries(${TARGET_NAME}
 	speexdsp
