@@ -1,6 +1,7 @@
 #include "AudioProcessor.h"
 
 #include "SpeexDSP.h"
+#include "Timer.h"
 #include "WebRTCDSP.h"
 
 #include <QAudioBuffer>
@@ -9,7 +10,7 @@
 namespace SpeexWebRTCTest {
 
 namespace {
-Q_LOGGING_CATEGORY(AudioProcessor, "processor")
+Q_LOGGING_CATEGORY(processor, "processor")
 }
 
 QVector<qreal> calculateAudioLevels(const QAudioBuffer& buffer);
@@ -130,6 +131,8 @@ void AudioProcessor::process()
 
 void AudioProcessor::processBuffer(QAudioBuffer& inputBuffer, const QAudioBuffer& monitorBuffer)
 {
+	TIMER(qDebug(processor))
+
 	QVector<qreal> inputLevels = calculateAudioLevels(inputBuffer);
 
 	if (dsp_)
