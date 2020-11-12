@@ -166,7 +166,10 @@ void WebRTCDSP::setParameter(const QString& param, QVariant value)
 		config.noise_suppression.level =
 		    static_cast<NoiseSuppressionLevel>(NoiseSuppressionLevel::kLow + value.toUInt());
 	else if (param == "echo_cancellation_enabled")
+	{
 		config.echo_canceller.enabled = value.toBool();
+		config.residual_echo_detector.enabled = value.toBool();
+	}
 	else if (param == "echo_cancellation_suppression_level")
 		return; // TODO ???
 	else if (param == "gain_control_enabled")

@@ -7,6 +7,7 @@
 #include <QAudioInput>
 #include <QAudioOutput>
 #include <QMainWindow>
+#include <QThread>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -50,6 +51,9 @@ private:
 	void setupDials(Backend backend);
 
 	Ui::MainWindow* ui = nullptr;
+
+	QThread audioInputThread_;
+	QThread audioOutputThread_;
 
 	QScopedPointer<QAudioInput> audioInput_;
 	QScopedPointer<QAudioInput> monitorInput_;

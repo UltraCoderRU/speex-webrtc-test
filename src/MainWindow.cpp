@@ -44,6 +44,9 @@ MainWindow::MainWindow() : ui(new Ui::MainWindow)
 {
 	ui->setupUi(this);
 
+	audioInputThread_.start();
+	audioOutputThread_.start();
+
 	qDebug(Gui) << "Enumerating audio devices...";
 	for (auto& deviceInfo : QAudioDeviceInfo::availableDevices(QAudio::AudioInput))
 	{
@@ -83,6 +86,8 @@ MainWindow::MainWindow() : ui(new Ui::MainWindow)
 MainWindow::~MainWindow()
 {
 	stopRecording();
+	audioInputThread_.exit(0);
+	audioOutputThread_.exit(0);
 }
 
 void fixFormatForDevice(QAudioFormat& format, const QAudioDeviceInfo& info)
@@ -114,6 +119,10 @@ void MainWindow::initializeAudio(const QAudioDeviceInfo& inputDeviceInfo,
 	audioOutput_.reset(new QAudioOutput(outputDeviceInfo, outputFormat));
 	monitorInput_.reset(new QAudioInput(monitorDeviceInfo, monitorFormat));
 
+	audioInput_->moveToThread(&audioInputThread_);
+	audioOutput_->moveToThread(&audioOutputThread_);
+	monitorInput_->moveToThread(&audioInputThread_);
+
 	processor_.reset(new AudioProcessor(captureFormat, monitorFormat, monitorBuffer_));
 	connect(processor_.get(), &AudioProcessor::voiceActivityChanged, this,
 	        &MainWindow::updateVoiceActivity);
@@ -132,6 +141,9 @@ void MainWindow::startRecording()
 	audioInput_->start(processor_.get());
 	audioOutput_->start(processor_.get());
 	monitorInput_->start(&monitorBuffer_);
+
+	qInfo(Gui) << "input buffer size:" << audioInput_->bufferSize();
+	qInfo(Gui) << "output buffer size:" << audioOutput_->bufferSize();
 }
 
 void MainWindow::stopRecording()
@@ -191,11 +203,21 @@ QString levelFromCode(int value)
 void MainWindow::setupDials(Backend backend)
 {
 	ui->noiseGroupBox->setChecked(false);
-	ui->agcGroupBox->setChecked(false);
-	ui->aecGroupBox->setChecked(false);
 	ui->noiseSuppressionDial->setValue(0);
+
+	ui->agcGroupBox->setChecked(false);
 	ui->agcLevelDial->setValue(0);
 	ui->agcLevelValue->setText("0 dBFS");
+	ui->agcMaxGainDial->setValue(0);
+	ui->agcMaxGainValue->setText("0 dB");
+	ui->agcMaxIncrementDial->setValue(0);
+	ui->agcMaxIncrementValue->setText("0 dB/sec");
+	ui->agcMaxDecrementDial->setValue(0);
+	ui->agcMaxDecrementValue->setText("0 dB/sec");
+
+	ui->aecGroupBox->setChecked(false);
+	ui->aecSuppressionDial->setValue(0);
+
 	updateVoiceActivity(false);
 
 	if (backend == Backend::Speex)
@@ -234,15 +256,18 @@ void MainWindow::setupDials(Backend backend)
 
 void MainWindow::changeNoiseReductionSettings()
 {
-	processor_->setEffectParam("noise_reduction_enabled", ui->noiseGroupBox->isChecked());
 	if (currentBackend() == Backend::Speex)
 	{
+		std::int32_t enabled = ui->noiseGroupBox->isChecked() ? 1 : 0;
+		processor_->setEffectParam("noise_reduction_enabled", enabled);
+
 		std::int32_t maxAttenuation = -ui->noiseSuppressionDial->value();
 		ui->noiseSuppressionValue->setText(QString("%1 dB").arg(-maxAttenuation));
 		processor_->setEffectParam("noise_reduction_max_attenuation", maxAttenuation);
 	}
 	else
 	{
+		processor_->setEffectParam("noise_reduction_enabled", ui->noiseGroupBox->isChecked());
 		int suppressionLevel = ui->noiseSuppressionDial->value();
 		ui->noiseSuppressionValue->setText(levelFromCode(suppressionLevel));
 		processor_->setEffectParam("noise_reduction_suppression_level", suppressionLevel);
@@ -251,10 +276,11 @@ void MainWindow::changeNoiseReductionSettings()
 
 void MainWindow::changeAGCSettings()
 {
-	processor_->setEffectParam("gain_control_enabled", ui->agcGroupBox->isChecked());
-
 	if (currentBackend() == Backend::Speex)
 	{
+		std::int32_t enabled = ui->agcGroupBox->isChecked() ? 1 : 0;
+		processor_->setEffectParam("gain_control_enabled", enabled);
+
 		std::int32_t level =
 		    QAudio::convertVolume(-ui->agcLevelDial->value(), QAudio::DecibelVolumeScale,
 		                          QAudio::LinearVolumeScale) *
@@ -276,6 +302,8 @@ void MainWindow::changeAGCSettings()
 	}
 	else
 	{
+		processor_->setEffectParam("gain_control_enabled", ui->agcGroupBox->isChecked());
+
 		int level = ui->agcLevelDial->value();
 		ui->agcLevelValue->setText(QString("%1 dBFS").arg(-ui->agcLevelDial->value()));
 		processor_->setEffectParam("gain_control_target_level", level);
@@ -288,9 +316,11 @@ void MainWindow::changeAGCSettings()
 
 void MainWindow::changeAECSettings()
 {
-	processor_->setEffectParam("echo_cancellation_enabled", ui->aecGroupBox->isChecked());
 	if (currentBackend() == Backend::Speex)
 	{
+		std::int32_t enabled = ui->aecGroupBox->isChecked() ? 1 : 0;
+		processor_->setEffectParam("echo_cancellation_enabled", enabled);
+
 		std::int32_t maxAttenuation = -ui->aecSuppressionDial->value();
 		ui->aecSuppressionValue->setText(QString("%1 dB").arg(-maxAttenuation));
 
@@ -298,6 +328,8 @@ void MainWindow::changeAECSettings()
 	}
 	else
 	{
+		processor_->setEffectParam("echo_cancellation_enabled", ui->aecGroupBox->isChecked());
+
 		int suppressionLevel = ui->aecSuppressionDial->value();
 		ui->aecSuppressionValue->setText(levelFromCode(suppressionLevel));
 
