@@ -1,5 +1,7 @@
 #include "WebRTCDSP.h"
 
+#include "Timer.h"
+
 #include <webrtc/api/audio/audio_frame.h>
 #include <webrtc/modules/audio_processing/include/audio_processing.h>
 
@@ -110,6 +112,8 @@ QString errorDescription(int error)
 
 void WebRTCDSP::processFrame(QAudioBuffer& mainBuffer, const QAudioBuffer& auxBuffer)
 {
+	TIMER(qDebug(WebRTC))
+
 	qDebug(WebRTC).noquote() << QString(
 	                                "got %1 near-end samples at %2 Hz (%3ms) and %4 far-end "
 	                                "samples at %5 (%6ms)")

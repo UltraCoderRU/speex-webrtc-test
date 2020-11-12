@@ -1,6 +1,7 @@
 #include "AudioProcessor.h"
 
 #include "SpeexDSP.h"
+#include "Timer.h"
 #include "WebRTCDSP.h"
 
 #include <QAudioBuffer>
@@ -9,7 +10,7 @@
 namespace SpeexWebRTCTest {
 
 namespace {
-Q_LOGGING_CATEGORY(AudioProcessor, "processor")
+Q_LOGGING_CATEGORY(processor, "processor")
 }
 
 QVector<qreal> calculateAudioLevels(const QAudioBuffer& buffer);
@@ -78,6 +79,8 @@ void AudioProcessor::process()
 {
 	while (doWork_)
 	{
+		auto waitUntil = std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(5);
+
 		const std::size_t bytesToRead =
 		    bufferSize_ * format_.sampleSize() / 8 * format_.channelCount();
 		const std::size_t monitorToRead =
@@ -122,12 +125,14 @@ void AudioProcessor::process()
 			emit readyRead();
 		}
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(5));
+		std::this_thread::sleep_until(waitUntil);
 	}
 }
 
 void AudioProcessor::processBuffer(QAudioBuffer& inputBuffer, const QAudioBuffer& monitorBuffer)
 {
+	TIMER(qDebug(processor))
+
 	QVector<qreal> inputLevels = calculateAudioLevels(inputBuffer);
 
 	if (dsp_)
@@ -157,6 +162,10 @@ qint64 AudioProcessor::bytesAvailable() const
 
 bool AudioProcessor::open(QIODevice::OpenMode mode)
 {
+	std::unique_lock<std::mutex> lock1(inputMutex_);
+	std::unique_lock<std::mutex> lock2(outputMutex_);
+	std::unique_lock<std::mutex> lock3(monitorMutex_);
+
 	inputBuffer_.clear();
 	outputBuffer_.clear();
 	monitorBuffer_.clear();
@@ -195,6 +204,14 @@ Backend AudioProcessor::getCurrentBackend() const
 
 void AudioProcessor::switchBackend(Backend backend)
 {
+	std::unique_lock<std::mutex> lock1(inputMutex_);
+	std::unique_lock<std::mutex> lock2(outputMutex_);
+	std::unique_lock<std::mutex> lock3(monitorMutex_);
+
+	inputBuffer_.clear();
+	outputBuffer_.clear();
+	monitorBuffer_.clear();
+
 	if (backend == Backend::Speex)
 		dsp_.reset(new SpeexDSP(format_, monitorFormat_));
 	else

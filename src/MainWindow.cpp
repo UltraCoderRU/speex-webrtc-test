@@ -85,6 +85,18 @@ MainWindow::~MainWindow()
 	stopRecording();
 }
 
+void fixFormatForDevice(QAudioFormat& format, const QAudioDeviceInfo& info)
+{
+	if (!info.isFormatSupported(format))
+	{
+		QAudioFormat newFormat = info.nearestFormat(format);
+		qWarning(Gui).nospace() << "Preferred format " << format << " is not supported by device "
+		                        << info.deviceName() << ".";
+		qWarning(Gui) << "Trying to use nearest format" << newFormat;
+		format = newFormat;
+	}
+}
+
 void MainWindow::initializeAudio(const QAudioDeviceInfo& inputDeviceInfo,
                                  const QAudioDeviceInfo& outputDeviceInfo,
                                  const QAudioDeviceInfo& monitorDeviceInfo)
@@ -94,24 +106,9 @@ void MainWindow::initializeAudio(const QAudioDeviceInfo& inputDeviceInfo,
 	auto outputFormat = getOutputFormat();
 	auto monitorFormat = getMonitorFormat();
 
-	if (!inputDeviceInfo.isFormatSupported(captureFormat))
-	{
-		qWarning(Gui)
-		    << "Preferred format is not supported by input device - trying to use nearest";
-		captureFormat = inputDeviceInfo.nearestFormat(captureFormat);
-	}
-	if (!monitorDeviceInfo.isFormatSupported(monitorFormat))
-	{
-		qWarning(Gui)
-		    << "Preferred format is not supported by monitor device - trying to use nearest";
-		monitorFormat = inputDeviceInfo.nearestFormat(monitorFormat);
-	}
-	if (!outputDeviceInfo.isFormatSupported(outputFormat))
-	{
-		qWarning(Gui)
-		    << "Preferred format is not supported by output device - trying to use nearest";
-		outputFormat = inputDeviceInfo.nearestFormat(outputFormat);
-	}
+	fixFormatForDevice(captureFormat, inputDeviceInfo);
+	fixFormatForDevice(outputFormat, outputDeviceInfo);
+	fixFormatForDevice(monitorFormat, monitorDeviceInfo);
 
 	audioInput_.reset(new QAudioInput(inputDeviceInfo, captureFormat));
 	audioOutput_.reset(new QAudioOutput(outputDeviceInfo, outputFormat));

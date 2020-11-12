@@ -1,5 +1,7 @@
 #include "SpeexDSP.h"
 
+#include "Timer.h"
+
 #include <speex/speex_echo.h>
 #include <speex/speex_preprocess.h>
 
@@ -36,6 +38,8 @@ SpeexDSP::~SpeexDSP()
 
 void SpeexDSP::processFrame(QAudioBuffer& mainBuffer, const QAudioBuffer& auxBuffer)
 {
+	TIMER(qDebug(Speex))
+
 	qDebug(Speex).noquote() << QString(
 	                               "got %1 near-end samples (%2ms) and %3 far-end samples (%4ms)")
 	                               .arg(mainBuffer.frameCount())
