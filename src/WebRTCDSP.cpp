@@ -59,11 +59,12 @@ WebRTCDSP::WebRTCDSP(const QAudioFormat& mainFormat, const QAudioFormat& auxForm
 	config.echo_canceller.mobile_mode = false;
 	config.residual_echo_detector.enabled = false;
 
-	config.gain_controller1.enabled = false;
-	config.gain_controller1.mode = webrtc::AudioProcessing::Config::GainController1::kAdaptiveDigital;
-	config.gain_controller1.enable_limiter = true;
-	config.gain_controller1.compression_gain_db = 0;
-	config.gain_controller1.target_level_dbfs = 0;
+	config.gain_controller2.enabled = false;
+	config.gain_controller2.adaptive_digital.enabled = true;
+	config.gain_controller2.adaptive_digital.level_estimator =
+	    webrtc::AudioProcessing::Config::GainController2::kRms;
+	config.gain_controller2.adaptive_digital.use_saturation_protector = true;
+	config.gain_controller2.adaptive_digital.extra_saturation_margin_db = 1;
 
 	apm_->ApplyConfig(config);
 }
@@ -165,19 +166,19 @@ void WebRTCDSP::setParameter(const QString& param, QVariant value)
 	else if (param == "noise_reduction_suppression_level")
 		config.noise_suppression.level =
 		    static_cast<NoiseSuppressionLevel>(NoiseSuppressionLevel::kLow + value.toUInt());
+	else if (param == "gain_control_enabled")
+		config.gain_controller2.enabled = value.toBool();
 	else if (param == "echo_cancellation_enabled")
 	{
 		config.echo_canceller.enabled = value.toBool();
 		config.residual_echo_detector.enabled = value.toBool();
 	}
-	else if (param == "echo_cancellation_suppression_level")
-		return; // TODO ???
-	else if (param == "gain_control_enabled")
-		config.gain_controller1.enabled = value.toBool();
 	else if (param == "gain_control_target_level")
-		config.gain_controller1.target_level_dbfs = value.toInt();
+		return;
 	else if (param == "gain_control_max_gain")
-		config.gain_controller1.compression_gain_db = value.toInt();
+		return;
+	else if (param == "echo_cancellation_suppression_level")
+		return;
 	else
 		throw std::invalid_argument("Invalid param");
 	apm_->ApplyConfig(config);
