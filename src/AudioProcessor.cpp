@@ -70,8 +70,10 @@ qint64 AudioProcessor::readData(char* data, qint64 maxlen)
 
 qint64 AudioProcessor::writeData(const char* data, qint64 len)
 {
-	std::unique_lock<std::mutex> lock(inputMutex_);
+	std::unique_lock<std::mutex> lock1(inputMutex_);
+	std::unique_lock<std::mutex> lock2(inputEventMutex_);
 	inputBuffer_.append(data, len);
+	inputEvent_.notify_all();
 	return len;
 }
 
@@ -121,6 +123,12 @@ void AudioProcessor::process()
 				outputBuffer_.append(buf.constData<char>(), buf.byteCount());
 				emit readyRead();
 			}
+		}
+		else
+		{
+			processLock.unlock();
+			std::unique_lock<std::mutex> lock(inputEventMutex_);
+			inputEvent_.wait(lock);
 		}
 	}
 }

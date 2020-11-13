@@ -9,6 +9,7 @@
 #include <QIODevice>
 #include <QScopedPointer>
 
+#include <condition_variable>
 #include <mutex>
 #include <thread>
 
@@ -78,6 +79,9 @@ private:
 
 	std::thread worker_;
 	bool doWork_ = false;
+
+	std::condition_variable inputEvent_;
+	std::mutex inputEventMutex_;
 
 	QScopedPointer<WavFileWriter> sourceEncoder_;
 	QScopedPointer<WavFileWriter> processedEncoder_;
