@@ -9,6 +9,7 @@
 #include <QIODevice>
 #include <QScopedPointer>
 
+#include <condition_variable>
 #include <mutex>
 #include <thread>
 
@@ -57,10 +58,13 @@ protected:
 private:
 	void process();
 	void processBuffer(QAudioBuffer& inputBuffer, const QAudioBuffer& monitorBuffer);
+	void clearBuffers();
 
 	mutable std::mutex inputMutex_;
 	mutable std::mutex outputMutex_;
 	mutable std::mutex monitorMutex_;
+
+	std::mutex processMutex_;
 
 	std::size_t bufferSize_;
 	const QAudioFormat format_;
@@ -75,6 +79,9 @@ private:
 
 	std::thread worker_;
 	bool doWork_ = false;
+
+	std::condition_variable inputEvent_;
+	std::mutex inputEventMutex_;
 
 	QScopedPointer<WavFileWriter> sourceEncoder_;
 	QScopedPointer<WavFileWriter> processedEncoder_;

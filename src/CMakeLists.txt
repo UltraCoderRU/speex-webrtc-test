@@ -1,4 +1,7 @@
 
+find_package(LibWebRTC REQUIRED)
+include(${LIBWEBRTC_USE_FILE})
+
 set(TARGET_NAME speex_webrtc_test)
 
 set(CMAKE_AUTOMOC ON)
@@ -17,7 +20,7 @@ file(GLOB_RECURSE RESOURCES *.qrc)
 
 target_link_libraries(${TARGET_NAME}
 	speexdsp
-	WebRTC
+	${LIBWEBRTC_LIBRARIES}
 	Qt5::Core
 	Qt5::Widgets
 	Qt5::Multimedia

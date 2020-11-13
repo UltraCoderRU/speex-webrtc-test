@@ -70,8 +70,10 @@ qint64 AudioProcessor::readData(char* data, qint64 maxlen)
 
 qint64 AudioProcessor::writeData(const char* data, qint64 len)
 {
-	std::unique_lock<std::mutex> lock(inputMutex_);
+	std::unique_lock<std::mutex> lock1(inputMutex_);
+	std::unique_lock<std::mutex> lock2(inputEventMutex_);
 	inputBuffer_.append(data, len);
+	inputEvent_.notify_all();
 	return len;
 }
 
@@ -79,7 +81,7 @@ void AudioProcessor::process()
 {
 	while (doWork_)
 	{
-		auto waitUntil = std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(5);
+		std::unique_lock<std::mutex> processLock(processMutex_);
 
 		const std::size_t bytesToRead =
 		    bufferSize_ * format_.sampleSize() / 8 * format_.channelCount();
@@ -119,13 +121,15 @@ void AudioProcessor::process()
 			{
 				std::unique_lock<std::mutex> lock(outputMutex_);
 				outputBuffer_.append(buf.constData<char>(), buf.byteCount());
+				emit readyRead();
 			}
-
-
-			emit readyRead();
 		}
-
-		std::this_thread::sleep_until(waitUntil);
+		else
+		{
+			processLock.unlock();
+			std::unique_lock<std::mutex> lock(inputEventMutex_);
+			inputEvent_.wait(lock);
+		}
 	}
 }
 
@@ -142,6 +146,22 @@ void AudioProcessor::processBuffer(QAudioBuffer& inputBuffer, const QAudioBuffer
 
 	emit inputLevelsChanged(inputLevels);
 	emit outputLevelsChanged(outputLevels);
+}
+
+void AudioProcessor::clearBuffers()
+{
+	{
+		std::unique_lock<std::mutex> lock(inputMutex_);
+		inputBuffer_.clear();
+	}
+	{
+		std::unique_lock<std::mutex> lock(outputMutex_);
+		outputBuffer_.clear();
+	}
+	{
+		std::unique_lock<std::mutex> lock(monitorMutex_);
+		monitorBuffer_.clear();
+	}
 }
 
 bool AudioProcessor::isSequential() const
@@ -162,13 +182,8 @@ qint64 AudioProcessor::bytesAvailable() const
 
 bool AudioProcessor::open(QIODevice::OpenMode mode)
 {
-	std::unique_lock<std::mutex> lock1(inputMutex_);
-	std::unique_lock<std::mutex> lock2(outputMutex_);
-	std::unique_lock<std::mutex> lock3(monitorMutex_);
-
-	inputBuffer_.clear();
-	outputBuffer_.clear();
-	monitorBuffer_.clear();
+	std::unique_lock<std::mutex> lock(processMutex_);
+	clearBuffers();
 
 	sourceEncoder_.reset(new WavFileWriter("source.wav", format_));
 	sourceEncoder_->open();
@@ -204,13 +219,8 @@ Backend AudioProcessor::getCurrentBackend() const
 
 void AudioProcessor::switchBackend(Backend backend)
 {
-	std::unique_lock<std::mutex> lock1(inputMutex_);
-	std::unique_lock<std::mutex> lock2(outputMutex_);
-	std::unique_lock<std::mutex> lock3(monitorMutex_);
-
-	inputBuffer_.clear();
-	outputBuffer_.clear();
-	monitorBuffer_.clear();
+	std::unique_lock<std::mutex> lock(processMutex_);
+	clearBuffers();
 
 	if (backend == Backend::Speex)
 		dsp_.reset(new SpeexDSP(format_, monitorFormat_));
