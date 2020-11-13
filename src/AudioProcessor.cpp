@@ -56,6 +56,7 @@ AudioProcessor::AudioProcessor(const QAudioFormat& format,
 AudioProcessor::~AudioProcessor()
 {
 	doWork_ = false;
+	inputEvent_.notify_all();
 	worker_.join();
 }
 
